@@ -1,0 +1,28 @@
+---
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { joinClasses } from "../utils/joinClasses";
+import { replaceUrls } from "../utils/replaceUrls";
+
+type Props = {
+  styles: string;
+  classes: string;
+  label: string;
+  url: string;
+};
+const { styles, classes, label, url } = Astro.props;
+const submenuClasses = joinClasses(classes, "group", "submenu", "relative");
+const href = replaceUrls(url, Astro.url.host);
+---
+
+<li class={submenuClasses} style={styles}>
+  <a href={href}>
+    {label}
+    <FontAwesomeIcon icon={faChevronDown} className="text-xs pl-1" />
+  </a>
+  <ul
+    class="hidden group-hover:block absolute top-full right-0 text-right bg-white whitespace-nowrap py-2 [&_a]:block [&_a]:px-4 [&_a]:py-2 [&_a]:text-event-horizon"
+  >
+    <slot />
+  </ul>
+</li>

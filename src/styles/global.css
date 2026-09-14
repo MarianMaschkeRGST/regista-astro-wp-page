@@ -1,0 +1,42 @@
+@import "tailwindcss";
+@source "../../node_modules/@wp-block-tools/styles";
+
+@theme {
+  /* CSS variables come from wordpress theme. Map to tailwind class */
+  --color-event-horizon: var(--color--event-horizon);
+  --color-starlight: var(--color--starlight);
+  --color-blast-off: var(--color--blast-off);
+  --color-black-hole: var(--color--black-hole);
+}
+
+@layer base {
+  body {
+    font-family: "Noto Sans JP Variable", sans-serif;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: bold;
+  }
+  h1 {
+    font-size: 2em;
+  }
+  h2 {
+    font-size: 1.5em;
+  }
+  h3 {
+    font-size: 1.17em;
+  }
+  h4 {
+    font-size: 1em;
+  }
+  h5 {
+    font-size: 0.83em;
+  }
+  h6 {
+    font-size: 0.67em;
+  }
+}

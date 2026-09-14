@@ -1,0 +1,89 @@
+---
+import Layout from "../layouts/Layout.astro";
+import BlockRenderer from "../components/BlockRenderer.astro";
+
+import type { Block } from "@wp-block-tools/styles";
+import type { GetStaticPaths } from "astro";
+
+type Seo = { metaDesc: string; title: string };
+type UriNodes = { nodes: { uri: string }[] };
+type AllPagesResult = { data: { pages: UriNodes; projects: UriNodes } };
+type PageResult = {
+  data: { nodeByUri: { id: string; blocks: Block[]; seo: Seo } | null };
+};
+
+export const getStaticPaths = (async () => {
+  const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: `
+		query AllPagesQuery {
+			pages(first: 10000){
+				nodes {
+				uri
+				}
+			}
+			projects(first: 10000){
+				nodes {
+				uri
+				}
+			}
+		}
+  `,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `WPGraphQL request failed: ${response.status} ${await response.text()}`,
+    );
+  }
+  const { data } = (await response.json()) as AllPagesResult;
+  return [...data.pages.nodes, ...data.projects.nodes].map((page) => ({
+    params: { slug: page.uri === "/" ? undefined : page.uri },
+  }));
+}) satisfies GetStaticPaths;
+
+const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    query: `
+	query PageQuery($uri : String!) {
+		nodeByUri(uri: $uri) {
+			... on Page {
+				id
+				blocks
+				seo {
+					metaDesc
+					title
+				}
+			}
+			... on Project {
+				id
+				blocks
+				seo {
+					metaDesc
+					title
+				}
+			}
+		}
+	}`,
+    variables: {
+      uri: Astro.params.slug || "/",
+    },
+  }),
+});
+if (!response.ok) {
+  throw new Error(
+    `WPGraphQL request failed: ${response.status} ${await response.text()}`,
+  );
+}
+const { data } = (await response.json()) as PageResult;
+const blocks = data.nodeByUri?.blocks ?? [];
+const seo = data.nodeByUri?.seo ?? { metaDesc: "", title: "" };
+---
+
+<Layout seo={seo}>
+  <BlockRenderer blocks={blocks} />
+</Layout>

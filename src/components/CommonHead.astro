@@ -1,0 +1,43 @@
+---
+import "@fontsource-variable/noto-sans-jp/wght.css";
+import "../styles/global.css";
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
+config.autoAddCss = false;
+
+type Props = {
+  title: string;
+  description: string;
+};
+
+const { title, description } = Astro.props;
+const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    query: `
+	query MetaDataQuery {
+		cssVariables
+	}
+  `,
+  }),
+});
+if (!response.ok) {
+  throw new Error(
+    `WPGraphQL request failed: ${response.status} ${await response.text()}`,
+  );
+}
+const { data } = await response.json();
+const cssVariables = data.cssVariables || "";
+---
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" href="/favicon.ico" />
+  <meta name="generator" content={Astro.generator} />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <style set:html={`:root{${cssVariables}}`}></style>
+</head>

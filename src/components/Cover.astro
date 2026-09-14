@@ -1,0 +1,67 @@
+---
+import { Image } from "astro:assets";
+
+import { joinClasses } from "../utils/joinClasses";
+
+type Props = {
+  styles: string;
+  classes: string;
+  url?: string;
+  height?: number;
+  width?: number;
+  dimRatio?: number;
+  overlayColor?: string;
+  customOverlayColor?: string;
+  gradient?: string;
+  customGradient?: string;
+};
+
+const {
+  styles,
+  classes,
+  url,
+  height,
+  width,
+  dimRatio = 100,
+  overlayColor = "#000000",
+  customOverlayColor,
+  gradient,
+  customGradient,
+} = Astro.props;
+const coverClasses = joinClasses(
+  classes,
+  "relative",
+  "flex",
+  "flex-col",
+  "items-center",
+  "justify-center",
+);
+const overlayStyle = customOverlayColor
+  ? `background-color: ${customOverlayColor}`
+  : `background-color: var(--color--${overlayColor})`;
+const gradientStyle = customGradient
+  ? `background: ${customGradient}`
+  : `background: var(--gradient--${gradient})`;
+---
+
+<div class={coverClasses} style={styles}>
+  {
+    !!url && (
+      <Image
+        class="absolute w-full h-full object-cover !max-w-full"
+        height={height || 1000}
+        width={width || 1000}
+        src={url}
+        alt=""
+      />
+    )
+  }
+  <div
+    class="absolute pointer-none: top-0 right-0 bottom-0 left-0 bg-black w-full h-full !max-w-full !m-0"
+    style={`opacity: ${dimRatio / 100}; ${gradient || customGradient ? gradientStyle : overlayStyle};`}
+  >
+  </div>
+  <div class="relative z-10 !m-0 !max-w-full min-h-full flex flex-col gap-4">
+    <slot />
+  </div>
+</div>

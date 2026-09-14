@@ -1,0 +1,51 @@
+---
+import BlockRenderer from "../components/BlockRenderer.astro";
+import Layout from "../layouts/Layout.astro";
+
+import type { Block } from "@wp-block-tools/styles";
+type Seo = { metaDesc: string; title: string };
+type PageResult = {
+  data: {
+    pages: { nodes: { id: string; blocks: Block[]; seo: Seo }[] };
+  };
+};
+
+// The `project` CPT's archive slug shadows this page's uri, so `nodeByUri`
+// resolves "/projects/" to a ContentType instead of the Page. Query by slug.
+const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    query: `
+	query ProjectsPageQuery($name : String!) {
+		pages(where: { name: $name }) {
+			nodes {
+				id
+				blocks
+				seo {
+					metaDesc
+					title
+				}
+			}
+		}
+	}`,
+    variables: {
+      name: "projects",
+    },
+  }),
+});
+if (!response.ok) {
+  throw new Error(
+    `WPGraphQL request failed: ${response.status} ${await response.text()}`,
+  );
+}
+
+const { data } = (await response.json()) as PageResult;
+const page = data.pages.nodes[0];
+const blocks = page?.blocks ?? [];
+const seo = page?.seo ?? { metaDesc: "", title: "" };
+---
+
+<Layout seo={seo}>
+  <BlockRenderer blocks={blocks} />
+</Layout>
