@@ -1,7 +1,15 @@
+// TODO before the first deploy:
+// 1. Set the OpenAI key as a secret: `npx wrangler secret put OPENAI_API_KEY`.
+//    It is read at runtime and is not part of .env.production.
+//    Same for the query log: `npx wrangler secret put QUERY_LOG_SECRET`, with the
+//    value of QUERY_LOG_SECRET in the production WordPress wp-config.php.
+// 2. Production WordPress (regista.cloudsandspaceships.com) must match local:
+//    as of 2026-09-15 it has no `belief`/`project`/`method` post types, no
+//    WPGraphQL and no Yoast, so `npm run build` cannot succeed against it yet.
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"compatibility_date": "2026-09-11",
-	"compatibility_flags": ["global_fetch_strictly_public"],
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 	"name": "regista-astro-hp",
 	"main": "@astrojs/cloudflare/entrypoints/server",
 	"assets": {

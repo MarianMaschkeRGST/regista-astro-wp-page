@@ -12,7 +12,7 @@ const { PUBLIC_WP_URL } = loadEnv(
 
 // https://astro.build/config
 export default defineConfig({
-  output: "server",
+  output: "static",
   image: {
     domains: [PUBLIC_WP_URL],
   },
@@ -22,5 +22,7 @@ export default defineConfig({
   },
 
   integrations: [react()],
-  adapter: cloudflare(),
+  adapter: cloudflare({
+    imageService: "compile",
+  }),
 });

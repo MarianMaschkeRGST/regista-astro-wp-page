@@ -4,6 +4,9 @@ dist/
 # generated types
 .astro/
 
+# wrangler local state and generated deploy config
+.wrangler/
+
 # dependencies
 node_modules/
 
@@ -14,11 +17,16 @@ yarn-error.log*
 pnpm-debug.log*
 
 # environment variables
+# .env holds secrets. .env.development and .env.production hold public config
+# and are committed.
 .env
-.env.production
+# Also secrets: Vite's local overrides and Wrangler's local secrets files.
+.env*.local
+.dev.vars*
 
 # macOS-specific files
 .DS_Store
 
 # jetbrains setting folder
 .idea/
+
