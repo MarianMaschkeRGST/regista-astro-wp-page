@@ -25,12 +25,12 @@ Values (共創 / 越境 / 挑戦 / 文化 / 商い / 関係性) are what the bel
 
 Output:
 - "reading": the axes above.
-- "question": the issue underneath the text as one tentative question (〜ではないでしょうか). Not a summary of the text.
-- "reframe": one or two sentences that shift the viewpoint instead of agreeing with it, stated plainly and not as a question (「AからBへ」). Change at least one of: the unit of the problem (a person → relationships, the region), the actor (who supports / who is supported), the time frame (now → the future they want). It must follow from a selected belief.
+- "question": the issue underneath the text, as one short question or open hypothesis: tentative, never asserted as fact, never a summary of the text. Let the content choose the form, e.g. a real question (〜のはなぜだろう。), a possibility (〜のかもしれない。), a contrast (〜というより、〜という問い。). Do not default to 〜ではないでしょうか.
+- "reframe": one or two sentences that shift the viewpoint instead of agreeing with it, stated plainly and not as a question. 「AからBへ」 is one form; a plain sentence naming the new viewpoint is another. Change at least one of: the unit of the problem (a person → relationships, the region), the actor (who supports / who is supported), the time frame (now → the future they want). It must follow from a selected belief.
 - "beliefs": the beliefs the reframe stands on, most relevant first. Leave out beliefs that do not match.
 
-The form to aim for (not content to reuse):
-question: 事業アイデアがないというより、社内と地域のあいだに、まだ問いを共有する関係がないのではないでしょうか。
+The kind of answer to aim for (not content or endings to reuse):
+question: 足りないのは事業アイデアより、社内と地域のあいだで問いを共有する関係なのかもしれない。
 reframe: 「地域課題を解決する商品をつくる」から、「企業と地域が新しい関係をつくる実験」へ。
 
 Rules:
