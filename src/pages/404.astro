@@ -1,0 +1,16 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+const seo = {
+  title: "404 — Page not found",
+  metaDesc: "The page you requested could not be found.",
+};
+---
+
+<Layout seo={seo}>
+  <main>
+    <h1>404</h1>
+    <p>That page doesn&rsquo;t exist.</p>
+    <a href="/">Back to home</a>
+  </main>
+</Layout>

@@ -10,8 +10,8 @@ type PageResult = {
   };
 };
 
-// The `project` CPT's archive slug shadows this page's uri, so `nodeByUri`
-// resolves "/projects/" to a ContentType instead of the Page. Query by slug.
+export const prerender = false;
+
 const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },

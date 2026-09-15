@@ -21,12 +21,14 @@ export const getStaticPaths = (async () => {
 		query AllPagesQuery {
 			pages(first: 10000){
 				nodes {
-				uri
+					uri
+					blocks(attributes: false)
 				}
 			}
 			projects(first: 10000){
 				nodes {
-				uri
+					uri
+					blocks(attributes: false)
 				}
 			}
 		}
@@ -39,9 +41,26 @@ export const getStaticPaths = (async () => {
     );
   }
   const { data } = (await response.json()) as AllPagesResult;
-  return [...data.pages.nodes, ...data.projects.nodes].map((page) => ({
-    params: { slug: page.uri === "/" ? undefined : page.uri },
-  }));
+  return [...data.pages.nodes, ...data.projects.nodes]
+    .filter((page: any) => {
+      let found = false;
+      const hasPropertySearch = (blocks: Block[]) => {
+        for (let block of blocks) {
+          if (block.name === "regista-hp/project-search") {
+            found = true;
+            break;
+          }
+          if (block.innerBlocks) {
+            hasPropertySearch(block.innerBlocks);
+          }
+        }
+      };
+      hasPropertySearch(page.blocks);
+      return !found;
+    })
+    .map((page) => ({
+      params: { slug: page.uri === "/" ? undefined : page.uri },
+    }));
 }) satisfies GetStaticPaths;
 
 const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
