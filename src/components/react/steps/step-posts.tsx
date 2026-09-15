@@ -108,11 +108,6 @@ export default function StepPosts({
           関連する問い・研究・フィールドノート・対談を提示する。
         </div>
         <div className="flex gap-4">
-          <h3>10 YOUR NEXT QUESTION</h3>
-          「ここまでを踏まえて、あなたは何を試したいです
-          か？」など再入力を促す。
-        </div>
-        <div className="flex gap-4">
           <h3>11 INVITATION</h3>
           相談・協業・参加・採用など、文脈に合うCTAへつな ぐ。
         </div>

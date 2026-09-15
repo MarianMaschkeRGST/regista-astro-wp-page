@@ -1,3 +1,4 @@
+import type { Reading } from "../pages/api/regista-for-you/_schema";
 import { restRoot } from "./wordpress";
 
 const WP_ROOT = import.meta.env.WORDPRESS_API_ROOT_URL;
@@ -14,6 +15,9 @@ export type QueryLogEntry = {
   /** WordPress post ids of the suggested beliefs. */
   beliefIds?: number[];
   costUsd?: number;
+} & {
+  /** The axis reading, `drive` included. Axes without a signal are omitted. */
+  [Axis in keyof Reading]?: NonNullable<Reading[Axis]>;
 };
 
 /** WordPress is slower than the rephrase itself; a hung write must not hold

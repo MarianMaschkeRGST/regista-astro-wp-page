@@ -5,27 +5,28 @@ import { z } from "zod";
 import { calculateCost } from "../../../lib/pricing";
 import { logQuery, type QueryLogEntry } from "../../../lib/query-log";
 import { fetchBeliefs } from "../../../lib/wordpress";
-import { MAX_TEXT_LENGTH, type Belief, type Rephrasing } from "./_schema";
+import { AXES, MAX_TEXT_LENGTH, type Belief, type Rephrasing } from "./_schema";
 
 export const prerender = false;
 
 const MAX_BELIEFS = 2;
 // どうぜならおもしろく: shown when no belief matches.
-const DEFAULT_BELIEF_ID = "273";
+const DEFAULT_BELIEF_ID = import.meta.env.DEFAULT_WP_BELIEF_POST_ID || "273";
 
 const REPHRASE_RUBRIC = `This is the website of Regista Inc.(株式会社レジスタ). A visitor writes what they are currently thinking about society, their region or their work. Do not answer or fulfil it. Read the text along the axes below, find the question behind it, reframe that question through the company's beliefs, and select the beliefs the reframe stands on.
 
-Axes (examples, not exhaustive):
-- who: 企業 / 行政 / 寺院 / NPO / 若者 / 個人
-- theme: 地域・地域資産 / 教育 / 文化 / コミュニティ・関係人口 / 新規事業・事業開発 / 挑戦機会 / 世代間分断
-- stage: モヤモヤ / 構想 / 実証 / 実装 / 拡大
-- drive: 違和感 / 危機感 / 好奇心 / 希望
-- ask: 知りたい(相談・研究) / 変えたい・つくりたい(依頼) / 誰かと組みたい(協業・参加) / 採用
+Axes: one value each, or null. Read only what the text states, never infer: "who" needs the visitor to name their role, "ask" needs them to say what they want. For a short text, null is the right answer for most axes.
+- who: ${AXES.who.join(" / ")}
+- theme: ${AXES.theme.join(" / ")}
+- stage: ${AXES.stage.join(" / ")}
+- drive: ${AXES.drive.join(" / ")}
+- ask: ${AXES.ask.join(" / ")} (知りたい → 相談・研究, 変えたい・つくりたい → 依頼, 誰かと組みたい → 協業・参加)
 Values (共創 / 越境 / 挑戦 / 文化 / 商い / 関係性) are what the beliefs express: match beliefs on them.
 
 Output:
+- "reading": the axes above.
 - "question": the issue underneath the text as one tentative question (〜ではないでしょうか). Not a summary of the text.
-- "reframe": one or two sentences that shift the viewpoint instead of agreeing with it. Change at least one of: the unit of the problem (a person → relationships, the region), the actor (who supports / who is supported), the time frame (now → the future they want). It must follow from a selected belief.
+- "reframe": one or two sentences that shift the viewpoint instead of agreeing with it, stated plainly and not as a question (「AからBへ」). Change at least one of: the unit of the problem (a person → relationships, the region), the actor (who supports / who is supported), the time frame (now → the future they want). It must follow from a selected belief.
 - "beliefs": the beliefs the reframe stands on, most relevant first. Leave out beliefs that do not match.
 
 The form to aim for (not content to reuse):
@@ -33,7 +34,6 @@ question: 事業アイデアがないというより、社内と地域のあい�
 reframe: 「地域課題を解決する商品をつくる」から、「企業と地域が新しい関係をつくる実験」へ。
 
 Rules:
-- Read an axis only where the text gives a signal. Never guess the rest, least of all "who".
 - Never restate the request back (〜したいのですね) or answer it.
 - You are not the company's spokesperson: never promise, offer or invite on its behalf (一緒に〜 / ご相談ください / お手伝いできます), and never state facts, figures or projects about it.
 - Do not psychoanalyse the visitor. Name the situation, not their character.
@@ -59,13 +59,21 @@ async function rephrase(text: string, beliefs: Belief[]) {
     },
     output: Output.object({
       schema: z.object({
+        // First, so the question and reframe are written on top of the reading.
+        reading: z.object({
+          who: z.enum(AXES.who).nullable(),
+          theme: z.enum(AXES.theme).nullable(),
+          stage: z.enum(AXES.stage).nullable(),
+          drive: z.enum(AXES.drive).nullable(),
+          ask: z.enum(AXES.ask).nullable(),
+        }),
         question: z.string(),
         reframe: z.string(),
         beliefs: z.array(z.enum(beliefs.map((belief) => belief.id))),
       }),
       name: "rephrasing",
       description:
-        "The question behind the visitor's text, a reframe of it, and the beliefs the reframe stands on",
+        "The axis reading of the visitor's text, the question behind it, a reframe of it, and the beliefs the reframe stands on",
     }),
     instructions: REPHRASE_RUBRIC,
     prompt: `Beliefs (${candidates.length}):
@@ -116,6 +124,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const fallback = byId.get(DEFAULT_BELIEF_ID);
     const selected = matched.length === 0 && fallback ? [fallback] : matched;
 
+    // null means "no signal" and is not stored.
+    Object.assign(
+      log,
+      Object.fromEntries(
+        Object.entries(output.reading).filter(([, value]) => value !== null),
+      ),
+    );
     log.question = output.question;
     log.reframe = output.reframe;
     log.beliefIds = selected.map((belief) => Number(belief.id));
@@ -124,9 +139,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
       question: output.question,
       reframe: output.reframe,
       beliefs: selected,
+      // `drive` stays on the server: it is never shown to the visitor.
+      reading: {
+        who: output.reading.who,
+        theme: output.reading.theme,
+        stage: output.reading.stage,
+        ask: output.reading.ask,
+      },
       calls: import.meta.env.DEV
         ? [{ label: "Rephrase", model, usage }]
         : undefined,
+      debugReading: import.meta.env.DEV ? output.reading : undefined,
     } satisfies Rephrasing);
   } catch (error) {
     if (NoObjectGeneratedError.isInstance(error)) {

@@ -52,7 +52,7 @@ function RegistaForYouFlow() {
           type: "success",
           title: "Usage",
           timeout: 0,
-          data: { calls: result.calls },
+          data: { calls: result.calls, reading: result.debugReading },
         });
       }
       setStep("confirm");

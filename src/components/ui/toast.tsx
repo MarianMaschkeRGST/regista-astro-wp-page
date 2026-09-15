@@ -11,10 +11,13 @@ import {
   OctagonXIcon,
   Loader2Icon,
 } from "lucide-react";
+import type { Reading } from "../../pages/api/regista-for-you/_schema";
+import { ReadingBreakdown } from "./reading-breakdown";
 import { UsageBreakdown, type UsageCall } from "./usage-breakdown";
 
 type ToastData = {
   calls: UsageCall[];
+  reading?: Reading;
 };
 const toast = ToastPrimitive.createToastManager<ToastData>();
 
@@ -186,7 +189,10 @@ function ToastList() {
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <ToastTitle />
           <ToastDescription />
-          {toastItem.data && <UsageBreakdown {...toastItem.data} />}
+          {toastItem.data && <UsageBreakdown calls={toastItem.data.calls} />}
+          {toastItem.data?.reading && (
+            <ReadingBreakdown reading={toastItem.data.reading} />
+          )}
         </div>
         <ToastAction />
         <ToastClose />
