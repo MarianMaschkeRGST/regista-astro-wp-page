@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   MAX_TEXT_LENGTH,
   type PostsRequest,
@@ -24,6 +24,17 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return payload as T;
 }
 
+/** Everything /posts needs comes out of the rephrase, so it can start early. */
+function postsBody(text: string, rephrasing: Rephrasing): PostsRequest {
+  return {
+    beliefs: rephrasing.beliefs.map((belief) => belief.id),
+    text,
+    question: rephrasing.question,
+    reframe: rephrasing.reframe,
+    reading: rephrasing.reading,
+  };
+}
+
 // The toast manager is global, so one Toaster around the flow serves every step.
 export default function RegistaForYou() {
   return (
@@ -39,7 +50,20 @@ function RegistaForYouFlow() {
   const [rephrasing, setRephrasing] = useState<Rephrasing | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [error, setError] = useState("");
-  console.log(rephrasing);
+
+  /**
+   * The results are fetched while the visitor reads the confirm screen, so
+   * accepting the question is instant. A rejected question wastes one call,
+   * which is cheaper than making everyone wait through two in sequence.
+   * The promise is stored already settled, so it can sit unawaited.
+   */
+  const prefetched = useRef<{
+    token: number;
+    settled: Promise<{ results?: Results }>;
+  } | null>(null);
+  // Bumped whenever the visitor starts over, so a late prefetch is ignored.
+  const token = useRef(0);
+
   async function rephrase() {
     setStep("loading");
     try {
@@ -48,6 +72,17 @@ function RegistaForYouFlow() {
         { text },
       );
       setRephrasing(result);
+      const current = ++token.current;
+      prefetched.current = {
+        token: current,
+        settled: postJson<Results>(
+          "/api/regista-for-you/posts",
+          postsBody(text, result),
+        ).then(
+          (results) => ({ results }),
+          () => ({}),
+        ),
+      };
       if (result.calls) {
         toast.add({
           type: "success",
@@ -66,13 +101,17 @@ function RegistaForYouFlow() {
   async function confirmQuery() {
     setStep("loading");
     try {
-      const result = await postJson<Results>("/api/regista-for-you/posts", {
-        beliefs: rephrasing!.beliefs.map((belief) => belief.id),
-        text,
-        question: rephrasing!.question,
-        reframe: rephrasing!.reframe,
-        reading: rephrasing!.reading,
-      } satisfies PostsRequest);
+      const pending = prefetched.current;
+      const prefetch =
+        pending?.token === token.current ? await pending.settled : null;
+      // The visitor never asked for the prefetch, so its failure must not be
+      // theirs: fetch again now and only then show an error.
+      const result =
+        prefetch?.results ??
+        (await postJson<Results>(
+          "/api/regista-for-you/posts",
+          postsBody(text, rephrasing!),
+        ));
       setResults(result);
       if (result.calls) {
         toast.add({
@@ -90,6 +129,8 @@ function RegistaForYouFlow() {
   }
 
   function restart() {
+    token.current++;
+    prefetched.current = null;
     setStep("input");
     setRephrasing(null);
     setResults(null);
