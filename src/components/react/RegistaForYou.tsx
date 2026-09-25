@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   MAX_TEXT_LENGTH,
+  type PostsRequest,
   type Rephrasing,
   type Results,
 } from "../../pages/api/regista-for-you/_schema.ts";
@@ -62,14 +63,25 @@ function RegistaForYouFlow() {
     }
   }
 
-  async function confirm() {
+  async function confirmQuery() {
     setStep("loading");
     try {
-      setResults(
-        await postJson<Results>("/api/regista-for-you/posts", {
-          beliefs: rephrasing!.beliefs.map((belief) => belief.id),
-        }),
-      );
+      const result = await postJson<Results>("/api/regista-for-you/posts", {
+        beliefs: rephrasing!.beliefs.map((belief) => belief.id),
+        text,
+        question: rephrasing!.question,
+        reframe: rephrasing!.reframe,
+        reading: rephrasing!.reading,
+      } satisfies PostsRequest);
+      setResults(result);
+      if (result.calls) {
+        toast.add({
+          type: "success",
+          title: "Usage",
+          timeout: 0,
+          data: { calls: result.calls },
+        });
+      }
       setStep("posts");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -121,7 +133,7 @@ function RegistaForYouFlow() {
         <div className="flex gap-4">
           <button
             className="bg-blast-off rounded-full px-6 py-3 font-bold tracking-[1.3px] uppercase"
-            onClick={confirm}
+            onClick={confirmQuery}
           >
             この問いで進む
           </button>

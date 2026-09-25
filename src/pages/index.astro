@@ -1,0 +1,14 @@
+---
+import Layout from "../layouts/Layout.astro";
+import RegistaForYou from "../components/react/RegistaForYou.tsx";
+
+const seo = {
+  title: "regista for you",
+  metaDesc: "「問い」から、あなたにとって意味のあるレジスタへ。",
+};
+---
+
+<Layout seo={seo}>
+  <h1>どうせなら、おもしろく。</h1>
+  <RegistaForYou client:load />
+</Layout>

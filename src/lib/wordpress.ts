@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { Belief } from "../pages/api/regista-for-you/_schema";
-import type { Method, Project } from "../pages/api/regista-for-you/_select";
+import type {
+  Member,
+  Method,
+  Note,
+  Project,
+} from "../pages/api/regista-for-you/_select";
 
 const WP_ROOT = import.meta.env.WORDPRESS_API_ROOT_URL;
 const GRAPHQL_URL = import.meta.env.WPGRAPHQL_URL;
@@ -74,9 +79,13 @@ export async function fetchBeliefs(): Promise<Belief[]> {
 }
 
 /**
- * The ACF field groups are exposed under `relatedBeliefs` (on Method) and
- * `relatedMethod` (on Project). Their names must differ from the post type
- * names: a group named `belief` would collide with the `Belief` GraphQL type.
+ * The ACF field groups are exposed under `relatedBeliefs` (on Method),
+ * `relatedMethod` (on Project) and `memberFields` (on Member). Their names
+ * must differ from the post type names: a group named `belief` would collide
+ * with the `Belief` GraphQL type. Inside a group, each field carries its own
+ * `graphql_field_name`, which is why Member reaches its methods through
+ * `memberFields.method` rather than `relatedMethod`, and a Note reaches its
+ * projects through `fieldNotesFields.pj`.
  */
 const METHODS_AND_PROJECTS_QUERY = `
   query RegistaForYouPosts {
@@ -86,8 +95,67 @@ const METHODS_AND_PROJECTS_QUERY = `
         title
         excerpt
         uri
+        methodFields {
+          theory
+          data
+        }
         relatedBeliefs {
           belief {
+            nodes {
+              databaseId
+            }
+          }
+        }
+      }
+    }
+    members(first: 100) {
+      nodes {
+        databaseId
+        title
+        excerpt
+        uri
+        memberFields {
+          role
+          one_liner
+          handlesAsk
+          relatedProject {
+            nodes {
+              databaseId
+            }
+          }
+          method {
+            nodes {
+              databaseId
+            }
+          }
+        }
+      }
+    }
+    notes(first: 100) {
+      nodes {
+        databaseId
+        title
+        excerpt
+        uri
+        fieldNotesFields {
+          question
+          nextQuestion
+          relatedBelief {
+            nodes {
+              databaseId
+            }
+          }
+          relatedMethod {
+            nodes {
+              databaseId
+            }
+          }
+          pj {
+            nodes {
+              databaseId
+            }
+          }
+          relatedMember {
             nodes {
               databaseId
             }
@@ -101,6 +169,16 @@ const METHODS_AND_PROJECTS_QUERY = `
         title
         excerpt
         uri
+        contentFields {
+          summary
+          evidence
+          quote
+        }
+        projectCategories {
+          nodes {
+            name
+          }
+        }
         relatedMethod {
           method {
             nodes {
@@ -130,7 +208,46 @@ const methodsAndProjectsSchema = z.object({
     nodes: z.array(
       z.object({
         ...gqlPostFields,
+        methodFields: z
+          .object({
+            theory: z.string().nullable(),
+            data: z.string().nullable(),
+          })
+          .nullable(),
         relatedBeliefs: z.object({ belief: relationSchema }).nullable(),
+      }),
+    ),
+  }),
+  members: z.object({
+    nodes: z.array(
+      z.object({
+        ...gqlPostFields,
+        memberFields: z
+          .object({
+            role: z.string().nullable(),
+            one_liner: z.string().nullable(),
+            handlesAsk: z.array(z.string()).nullable(),
+            relatedProject: relationSchema,
+            method: relationSchema,
+          })
+          .nullable(),
+      }),
+    ),
+  }),
+  notes: z.object({
+    nodes: z.array(
+      z.object({
+        ...gqlPostFields,
+        fieldNotesFields: z
+          .object({
+            question: z.string().nullable(),
+            nextQuestion: z.string().nullable(),
+            relatedBelief: relationSchema,
+            relatedMethod: relationSchema,
+            pj: relationSchema,
+            relatedMember: relationSchema,
+          })
+          .nullable(),
       }),
     ),
   }),
@@ -138,6 +255,16 @@ const methodsAndProjectsSchema = z.object({
     nodes: z.array(
       z.object({
         ...gqlPostFields,
+        contentFields: z
+          .object({
+            summary: z.string().nullable(),
+            evidence: z.string().nullable(),
+            quote: z.string().nullable(),
+          })
+          .nullable(),
+        projectCategories: z
+          .object({ nodes: z.array(z.object({ name: z.string() })) })
+          .nullable(),
         relatedMethod: z.object({ method: relationSchema }).nullable(),
       }),
     ),
@@ -159,9 +286,11 @@ const toPost = (node: {
 const relatedIds = (relation: z.infer<typeof relationSchema>) =>
   (relation?.nodes ?? []).map((node) => String(node.databaseId));
 
-export async function fetchMethodsAndProjects(): Promise<{
+export async function fetchSelectableContent(): Promise<{
   methods: Method[];
   projects: Project[];
+  members: Member[];
+  notes: Note[];
 }> {
   if (!GRAPHQL_URL) throw new Error("WPGRAPHQL_URL is not set");
 
@@ -190,11 +319,36 @@ export async function fetchMethodsAndProjects(): Promise<{
   return {
     methods: data.methods.nodes.map((node) => ({
       ...toPost(node),
+      theory: plainText(node.methodFields?.theory ?? "", 600),
+      data: plainText(node.methodFields?.data ?? "", 600),
       beliefIds: relatedIds(node.relatedBeliefs?.belief ?? null),
     })),
     projects: data.projects.nodes.map((node) => ({
       ...toPost(node),
+      categories: (node.projectCategories?.nodes ?? []).map((term) =>
+        plainText(term.name, 60),
+      ),
+      summary: plainText(node.contentFields?.summary ?? "", 400),
+      evidence: plainText(node.contentFields?.evidence ?? "", 600),
+      quote: plainText(node.contentFields?.quote ?? "", 300),
       methodIds: relatedIds(node.relatedMethod?.method ?? null),
+    })),
+    members: data.members.nodes.map((node) => ({
+      ...toPost(node),
+      role: plainText(node.memberFields?.role ?? "", 120),
+      oneLiner: plainText(node.memberFields?.one_liner ?? "", 200),
+      handlesAsk: node.memberFields?.handlesAsk ?? [],
+      projectIds: relatedIds(node.memberFields?.relatedProject ?? null),
+      methodIds: relatedIds(node.memberFields?.method ?? null),
+    })),
+    notes: data.notes.nodes.map((node) => ({
+      ...toPost(node),
+      question: plainText(node.fieldNotesFields?.question ?? "", 300),
+      nextQuestion: plainText(node.fieldNotesFields?.nextQuestion ?? "", 300),
+      beliefIds: relatedIds(node.fieldNotesFields?.relatedBelief ?? null),
+      methodIds: relatedIds(node.fieldNotesFields?.relatedMethod ?? null),
+      projectIds: relatedIds(node.fieldNotesFields?.pj ?? null),
+      memberIds: relatedIds(node.fieldNotesFields?.relatedMember ?? null),
     })),
   };
 }

@@ -30,6 +30,19 @@ export const AXES = {
   ask: ["相談", "研究", "依頼", "協業", "参加", "採用"],
 } as const;
 
+/**
+ * ACF stores `handles_ask` on a member as these keys, whose labels are the
+ * `ask` values above. The Member Fields checkbox repeats them: change both.
+ */
+export const ASK_KEYS: Record<(typeof AXES)["ask"][number], string> = {
+  相談: "discuss",
+  研究: "research",
+  依頼: "request",
+  協業: "partner",
+  参加: "participate",
+  採用: "recruitment",
+};
+
 /** One value per axis, or null where the text gives no signal. */
 export type Reading = {
   [Axis in keyof typeof AXES]: (typeof AXES)[Axis][number] | null;
@@ -48,14 +61,41 @@ export type Rephrasing = {
   debugReading?: Reading;
 };
 
+export type MethodPost = Post & { theory: string; data: string };
+export type MemberPost = Post & { role: string; oneLiner: string };
+export type NotePost = Post & { question: string; nextQuestion: string };
+export type ProjectPost = Post & {
+  /** Names of the `project_categories` terms. */
+  categories: string[];
+  summary: string;
+  evidence: string;
+  quote: string;
+};
+
+/** What the posts route needs to rank content for this visitor. */
+export type PostsRequest = {
+  /** Belief ids from the rephrase step, at most two. */
+  beliefs: string[];
+  text: string;
+  question: string;
+  reframe: string;
+  reading: Omit<Reading, "drive">;
+};
+
 /** The posts route response, one list per result section. */
 export type Results = {
   /** 04 HOW CHANGE HAPPENS */
-  methods: Post[];
-  /** 05 IN THE REAL WORLD */
-  projects: Post[];
+  methods: MethodPost[];
+  /** 05 IN THE REAL WORLD, also the source of 07 WHAT CHANGED */
+  projects: ProjectPost[];
   /** 06 AN UNEXPECTED CONNECTION */
-  unexpected: Post[];
+  unexpected: ProjectPost[];
+  /** 08 PEOPLE WITH THE QUESTION */
+  members: MemberPost[];
+  /** 09 FIELD NOTES */
+  notes: NotePost[];
+  /** Model usage per call. Development only: it exposes models and costs. */
+  calls?: UsageCall[];
 };
 
 export const MAX_TEXT_LENGTH = 200;
