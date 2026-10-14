@@ -2,9 +2,11 @@ import type { LanguageModelUsage } from "ai";
 
 /**
  * USD per 1M tokens, standard tier.
- * Verified 2026-08-27 against https://developers.openai.com/api/docs/pricing
+ * Verified 2026-10-14 against https://developers.openai.com/api/docs/pricing
  */
 const PRICING = {
+  "gpt-6-sol": { input: 2.0, cachedInput: 0.2, output: 10.0 },
+  "gpt-6-luna": { input: 0.1, cachedInput: 0.01, output: 0.5 },
   "gpt-5.4": { input: 2.5, cachedInput: 0.25, output: 15.0 },
   "gpt-5.4-mini": { input: 0.75, cachedInput: 0.075, output: 4.5 },
   "gpt-5.4-nano": { input: 0.2, cachedInput: 0.02, output: 1.25 },

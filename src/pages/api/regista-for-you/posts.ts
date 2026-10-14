@@ -42,12 +42,18 @@ async function rank(
   projects: Project[],
   notes: Note[],
 ) {
-  const model = openai("gpt-5.4-mini");
+  const model = openai("gpt-6-luna");
   const noteIds = notes.map((note) => note.id);
 
   const { output, usage } = await generateText({
     model,
     providerOptions: {
+      // This call is prefetched while the visitor reads the confirm screen,
+      // so its latency is only hidden while it stays shorter than that read.
+      // Measured 2026-10-14 on this prompt: "low" runs 4.7-6.7s and still
+      // reasons (165-343 tokens), "medium" 5.4-12.6s. Both produced identical
+      // selections over six runs, so the extra budget buys nothing here and
+      // the visitor pays for it.
       openai: { reasoningEffort: "low", textVerbosity: "low" },
     },
     output: Output.object({
