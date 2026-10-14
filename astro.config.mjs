@@ -21,6 +21,12 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
 
+  // The Cloudflare adapter otherwise enables Astro sessions and declares a
+  // SESSION KV binding with no namespace id, which fails `wrangler deploy`.
+  // Nothing in this app uses Astro.session; re-enable it by creating a KV
+  // namespace and declaring it in wrangler.jsonc.
+  session: false,
+
   integrations: [react()],
   adapter: cloudflare({
     imageService: "compile",
