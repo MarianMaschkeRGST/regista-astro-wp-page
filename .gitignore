@@ -24,6 +24,11 @@ pnpm-debug.log*
 .env*.local
 .dev.vars*
 
+# WordPress config copied in for reference. Holds DB credentials, the auth
+# salts and QUERY_LOG_SECRET: never commit it, and prefer keeping it outside
+# this repo altogether.
+wp-config.php
+
 # macOS-specific files
 .DS_Store
 

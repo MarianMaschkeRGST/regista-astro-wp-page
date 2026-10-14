@@ -366,6 +366,7 @@ export type ContentNode = {
   /** The GraphQL type name, e.g. "Page", "Project", "Member". */
   typeName: string;
   uri: string;
+  title: string;
   blocks: unknown[];
   seo: { title: string; metaDesc: string };
 };
@@ -386,9 +387,15 @@ export const normalizeUri = (path: string) => {
 };
 
 /**
- * `blocks` resolves the block theme's template, so `core/post-title` and
- * `core/post-content` carry the post's own title and body. Every content type
- * answers the same fragment, which is what lets one template render them all.
+ * `postTemplate: false` asks for the post's own content blocks only. By
+ * default `blocks` resolves the active block theme's template, which would
+ * make this app's pages depend on a theme nobody renders: WordPress is
+ * headless here, and its templates are deliberately empty. The title comes
+ * from the post rather than from a `core/post-title` block for the same
+ * reason, and the layout around it belongs to Astro.
+ *
+ * Every content type answers the same fragment, which is what lets one
+ * template render them all.
  */
 const CONTENT_NODE_QUERY = `
   query RegistaContentNode($uri: String!, $slug: String!) {
@@ -405,7 +412,10 @@ const CONTENT_NODE_QUERY = `
   fragment NodeForTemplate on ContentNode {
     __typename
     uri
-    blocks
+    blocks(postTemplate: false)
+    ... on NodeWithTitle {
+      title
+    }
     seo {
       title
       metaDesc
@@ -416,6 +426,8 @@ const CONTENT_NODE_QUERY = `
 const contentNodeSchema = z.object({
   __typename: z.string(),
   uri: z.string().nullable(),
+  // Absent on a content type without a title, e.g. an attachment.
+  title: z.string().nullable().optional(),
   blocks: z.array(z.unknown()).nullable(),
   seo: z
     .object({
@@ -457,6 +469,7 @@ export async function fetchContentNode(
   return {
     typeName: node.__typename,
     uri: node.uri ?? uri,
+    title: plainText(node.title ?? "", 200),
     blocks: node.blocks ?? [],
     seo: {
       title: node.seo?.title ?? "",

@@ -11,6 +11,9 @@ import type { Block } from "@wp-block-tools/styles";
  * rendered from the block theme's template, so a member, a note or a method
  * has a page without anything being added here.
  *
+ * The page is the post's own title and content blocks: WordPress serves no
+ * template of its own here, it only holds the content.
+ *
  * A content type that needs more than its blocks gets its own route file —
  * src/pages/projects.astro, or src/pages/projects/[slug].astro — which Astro
  * matches before this catch-all.
@@ -35,6 +38,7 @@ const seo = node?.seo ?? {
   {
     node ? (
       <main data-content-type={node.typeName}>
+        {node.title && <h1>{node.title}</h1>}
         <BlockRenderer blocks={node.blocks as Block[]} />
       </main>
     ) : (
