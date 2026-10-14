@@ -1,11 +1,24 @@
-// TODO before the first deploy:
-// 1. Set the OpenAI key as a secret: `npx wrangler secret put OPENAI_API_KEY`.
-//    It is read at runtime and is not part of .env.production.
-//    Same for the query log: `npx wrangler secret put QUERY_LOG_SECRET`, with the
-//    value of QUERY_LOG_SECRET in the production WordPress wp-config.php.
-// 2. Production WordPress (regista.cloudsandspaceships.com) must match local:
-//    as of 2026-09-15 it has no `belief`/`project`/`method` post types, no
-//    WPGraphQL and no Yoast, so `npm run build` cannot succeed against it yet.
+// TODO before the first deploy. The build itself no longer needs WordPress —
+// every WordPress-backed route is `prerender = false` — so everything here is
+// about what has to be true at request time.
+//
+// 1. Secrets, both read at runtime and deliberately absent from .env.production:
+//    `npx wrangler secret put OPENAI_API_KEY`
+//    `npx wrangler secret put QUERY_LOG_SECRET`, with the value of
+//    QUERY_LOG_SECRET in the demo WordPress wp-config.php.
+// 2. The demo backend, https://regista.regista-demo.net (xserver, not uploaded
+//    as of 2026-10-14), must match local: theme regista-hp, which registers the
+//    belief / method / project / member / note post types, WPGraphQL + ACF +
+//    wpgraphql-acf + wpgraphql-blocks, Yoast + add-wpgraphql-seo (the page
+//    template queries `seo`), and both mu-plugins (regista-query-log,
+//    regista-interest).
+// 3. Check `POST /graphql` from outside the host: the Worker runs with
+//    global_fetch_strictly_public, so no private addresses and no basic auth,
+//    and an xserver WAF rule may block the POST.
+// 4. SEO, once the backend is up: set `site` in astro.config.mjs, query Yoast's
+//    `seo { fullHead }` and inject it in CommonHead, running it through
+//    utils/replaceUrls so canonical and og:url point at the Astro domain
+//    rather than at regista.regista-demo.net. Add robots.txt and a sitemap.
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"compatibility_date": "2026-09-11",

@@ -24,7 +24,6 @@ const { blocks } = Astro.props;
 {
   blocks.map((block) => {
     const { styles, classes } = getBlockStyling(block);
-    console.log(block);
     switch (block.name) {
       case "regista-hp/project-search":
         return <PropertySearch />;

@@ -1,108 +1,44 @@
 ---
-import Layout from "../layouts/Layout.astro";
 import BlockRenderer from "../components/BlockRenderer.astro";
+import Layout from "../layouts/Layout.astro";
+import NotFound from "../components/NotFound.astro";
+import { fetchContentNode } from "../lib/wordpress";
 
 import type { Block } from "@wp-block-tools/styles";
-import type { GetStaticPaths } from "astro";
 
-type Seo = { metaDesc: string; title: string };
-type UriNodes = { nodes: { uri: string }[] };
-type AllPagesResult = { data: { pages: UriNodes; projects: UriNodes } };
-type PageResult = {
-  data: { nodeByUri: { id: string; blocks: Block[]; seo: Seo } | null };
-};
+/**
+ * The unified template: every WordPress page, post and custom post type is
+ * rendered from the block theme's template, so a member, a note or a method
+ * has a page without anything being added here.
+ *
+ * A content type that needs more than its blocks gets its own route file —
+ * src/pages/projects.astro, or src/pages/projects/[slug].astro — which Astro
+ * matches before this catch-all.
+ *
+ * Rendered per request rather than prerendered: new WordPress content is live
+ * without a rebuild, and the build no longer needs WordPress to be reachable.
+ */
+export const prerender = false;
 
-export const getStaticPaths = (async () => {
-  const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: `
-		query AllPagesQuery {
-			pages(first: 10000){
-				nodes {
-					uri
-					blocks(attributes: false)
-				}
-			}
-			projects(first: 10000){
-				nodes {
-					uri
-					blocks(attributes: false)
-				}
-			}
-		}
-  `,
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `WPGraphQL request failed: ${response.status} ${await response.text()}`,
-    );
-  }
-  const { data } = (await response.json()) as AllPagesResult;
-  return [...data.pages.nodes, ...data.projects.nodes]
-    .filter((page: any) => {
-      let found = false;
-      const hasPropertySearch = (blocks: Block[]) => {
-        for (let block of blocks) {
-          if (block.name === "regista-hp/project-search") {
-            found = true;
-            break;
-          }
-          if (block.innerBlocks) {
-            hasPropertySearch(block.innerBlocks);
-          }
-        }
-      };
-      hasPropertySearch(page.blocks);
-      return !found;
-    })
-    .map((page) => ({
-      params: { slug: page.uri === "/" ? undefined : page.uri },
-    }));
-}) satisfies GetStaticPaths;
-
-const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    query: `
-	query PageQuery($uri : String!) {
-		nodeByUri(uri: $uri) {
-			... on Page {
-				id
-				blocks
-				seo {
-					metaDesc
-					title
-				}
-			}
-			... on Project {
-				id
-				blocks
-				seo {
-					metaDesc
-					title
-				}
-			}
-		}
-	}`,
-    variables: {
-      uri: Astro.params.slug || "/",
-    },
-  }),
-});
-if (!response.ok) {
-  throw new Error(
-    `WPGraphQL request failed: ${response.status} ${await response.text()}`,
-  );
+const node = await fetchContentNode(Astro.url.pathname);
+if (!node) {
+  Astro.response.status = 404;
 }
-const { data } = (await response.json()) as PageResult;
-const blocks = data.nodeByUri?.blocks ?? [];
-const seo = data.nodeByUri?.seo ?? { metaDesc: "", title: "" };
+
+const seo = node?.seo ?? {
+  title: "404 — Page not found",
+  metaDesc: "The page you requested could not be found.",
+};
 ---
 
 <Layout seo={seo}>
-  <BlockRenderer blocks={blocks} />
+  {
+    node ? (
+      <main data-content-type={node.typeName}>
+        <BlockRenderer blocks={node.blocks as Block[]} />
+      </main>
+    ) : (
+      <NotFound />
+    )
+  }
 </Layout>

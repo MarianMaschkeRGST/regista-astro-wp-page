@@ -79,6 +79,34 @@ export async function fetchBeliefs(): Promise<Belief[]> {
 }
 
 /**
+ * One WPGraphQL request, with the two failure modes it has: a transport error,
+ * and a 200 carrying an `errors` array, which is how it answers a bad query.
+ */
+async function wpGraphql(query: string, variables?: Record<string, unknown>) {
+  if (!GRAPHQL_URL) throw new Error("WPGRAPHQL_URL is not set");
+
+  const response = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!response.ok) {
+    throw new Error(`WPGraphQL responded ${response.status}`);
+  }
+
+  const payload = (await response.json()) as {
+    data?: unknown;
+    errors?: { message: string }[];
+  };
+  if (payload.errors?.length) {
+    throw new Error(
+      `WPGraphQL errors: ${payload.errors.map((e) => e.message).join("; ")}`,
+    );
+  }
+  return payload.data;
+}
+
+/**
  * The ACF field groups are exposed under `relatedBeliefs` (on Method),
  * `relatedMethod` (on Project) and `memberFields` (on Member). Their names
  * must differ from the post type names: a group named `belief` would collide
@@ -292,29 +320,9 @@ export async function fetchSelectableContent(): Promise<{
   members: Member[];
   notes: Note[];
 }> {
-  if (!GRAPHQL_URL) throw new Error("WPGRAPHQL_URL is not set");
-
-  const response = await fetch(GRAPHQL_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: METHODS_AND_PROJECTS_QUERY }),
-  });
-  if (!response.ok) {
-    throw new Error(`WPGraphQL responded ${response.status}`);
-  }
-
-  // WPGraphQL answers schema errors with a 200 and an `errors` array.
-  const payload = (await response.json()) as {
-    data?: unknown;
-    errors?: { message: string }[];
-  };
-  if (payload.errors?.length) {
-    throw new Error(
-      `WPGraphQL errors: ${payload.errors.map((e) => e.message).join("; ")}`,
-    );
-  }
-
-  const data = methodsAndProjectsSchema.parse(payload.data);
+  const data = methodsAndProjectsSchema.parse(
+    await wpGraphql(METHODS_AND_PROJECTS_QUERY),
+  );
 
   return {
     methods: data.methods.nodes.map((node) => ({
@@ -351,4 +359,135 @@ export async function fetchSelectableContent(): Promise<{
       memberIds: relatedIds(node.fieldNotesFields?.relatedMember ?? null),
     })),
   };
+}
+
+/** One page, post or custom post, as the unified template renders it. */
+export type ContentNode = {
+  /** The GraphQL type name, e.g. "Page", "Project", "Member". */
+  typeName: string;
+  uri: string;
+  blocks: unknown[];
+  seo: { title: string; metaDesc: string };
+};
+
+/**
+ * Leading and trailing slash, percent-decoded, so a WordPress `uri` and a
+ * request path compare equal: "/notes/a/" === "/notes/a" === "notes/a".
+ */
+export const normalizeUri = (path: string) => {
+  let decoded = path;
+  try {
+    decoded = decodeURIComponent(path);
+  } catch {
+    // A stray `%` is not an encoding; compare the path as it came in.
+  }
+  const trimmed = decoded.replace(/^\/+|\/+$/g, "");
+  return trimmed === "" ? "/" : `/${trimmed}/`;
+};
+
+/**
+ * `blocks` resolves the block theme's template, so `core/post-title` and
+ * `core/post-content` carry the post's own title and body. Every content type
+ * answers the same fragment, which is what lets one template render them all.
+ */
+const CONTENT_NODE_QUERY = `
+  query RegistaContentNode($uri: String!, $slug: String!) {
+    byUri: nodeByUri(uri: $uri) {
+      ...NodeForTemplate
+    }
+    bySlug: contentNodes(first: 5, where: { name: $slug }) {
+      nodes {
+        ...NodeForTemplate
+      }
+    }
+  }
+
+  fragment NodeForTemplate on ContentNode {
+    __typename
+    uri
+    blocks
+    seo {
+      title
+      metaDesc
+    }
+  }
+`;
+
+const contentNodeSchema = z.object({
+  __typename: z.string(),
+  uri: z.string().nullable(),
+  blocks: z.array(z.unknown()).nullable(),
+  seo: z
+    .object({
+      title: z.string().nullable(),
+      metaDesc: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+const contentNodeResultSchema = z.object({
+  byUri: contentNodeSchema.nullable(),
+  bySlug: z.object({ nodes: z.array(contentNodeSchema) }),
+});
+
+/**
+ * Resolves any request path to the WordPress node behind it, or null when
+ * nothing matches. `nodeByUri` cannot resolve a non-ASCII slug (a belief, for
+ * instance), so the slug is looked up in the same request as a fallback;
+ * WPGraphQL ignores a `name` it cannot match instead of returning nothing,
+ * which is why the candidate's own uri has to agree.
+ */
+export async function fetchContentNode(
+  path: string,
+): Promise<ContentNode | null> {
+  const uri = normalizeUri(path);
+  const slug = uri.split("/").filter(Boolean).pop() ?? "";
+
+  const data = contentNodeResultSchema.parse(
+    await wpGraphql(CONTENT_NODE_QUERY, { uri, slug }),
+  );
+
+  const node =
+    data.byUri ??
+    data.bySlug.nodes.find((candidate) =>
+      candidate.uri ? normalizeUri(candidate.uri) === uri : false,
+    );
+  if (!node) return null;
+
+  return {
+    typeName: node.__typename,
+    uri: node.uri ?? uri,
+    blocks: node.blocks ?? [],
+    seo: {
+      title: node.seo?.title ?? "",
+      metaDesc: node.seo?.metaDesc ?? "",
+    },
+  };
+}
+
+/**
+ * The WordPress theme's CSS custom properties, which every page needs in its
+ * <head>. Cached for the life of the worker isolate: they change with the
+ * theme, not with the page, and fetching them per page view would double the
+ * requests this site makes to WordPress.
+ *
+ * A failure is not fatal. The page renders without the theme's colours rather
+ * than not at all, which also keeps a build working while WordPress is down.
+ */
+let cachedCssVariables: string | null = null;
+
+export async function fetchCssVariables(): Promise<string> {
+  if (cachedCssVariables !== null) return cachedCssVariables;
+
+  try {
+    const data = z
+      .object({ cssVariables: z.string().nullable() })
+      .parse(await wpGraphql(`query MetaDataQuery { cssVariables }`));
+    cachedCssVariables = data.cssVariables ?? "";
+  } catch (error) {
+    // Not cached, so the next render tries again.
+    console.error("Could not load the theme CSS variables:", error);
+    return "";
+  }
+  return cachedCssVariables;
 }

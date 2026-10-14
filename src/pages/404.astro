@@ -1,5 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import NotFound from "../components/NotFound.astro";
 
 const seo = {
   title: "404 — Page not found",
@@ -8,9 +9,5 @@ const seo = {
 ---
 
 <Layout seo={seo}>
-  <main>
-    <h1>404</h1>
-    <p>That page doesn&rsquo;t exist.</p>
-    <a href="/">Back to home</a>
-  </main>
+  <NotFound />
 </Layout>

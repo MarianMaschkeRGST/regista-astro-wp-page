@@ -3,6 +3,7 @@ import "@fontsource-variable/noto-sans-jp/wght.css";
 import "../styles/global.css";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
+import { fetchCssVariables } from "../lib/wordpress";
 config.autoAddCss = false;
 
 type Props = {
@@ -11,24 +12,7 @@ type Props = {
 };
 
 const { title, description } = Astro.props;
-const response = await fetch(`${import.meta.env.WPGRAPHQL_URL}`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    query: `
-	query MetaDataQuery {
-		cssVariables
-	}
-  `,
-  }),
-});
-if (!response.ok) {
-  throw new Error(
-    `WPGraphQL request failed: ${response.status} ${await response.text()}`,
-  );
-}
-const { data } = await response.json();
-const cssVariables = data.cssVariables || "";
+const cssVariables = await fetchCssVariables();
 ---
 
 <head>

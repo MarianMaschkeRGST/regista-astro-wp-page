@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   MAX_TEXT_LENGTH,
   type PostsRequest,
@@ -7,6 +7,7 @@ import {
 } from "../../pages/api/regista-for-you/_schema.ts";
 import { Toaster, toast } from "../ui/toast.tsx";
 import AiLabel from "./ai-label.tsx";
+import { clearFlow, loadFlow, saveFlow } from "./session-store.ts";
 import StepPosts from "./steps/step-posts.tsx";
 
 type Step = "input" | "loading" | "confirm" | "posts" | "error";
@@ -34,6 +35,13 @@ function postsBody(text: string, rephrasing: Rephrasing): PostsRequest {
     reading: rephrasing.reading,
   };
 }
+
+/**
+ * The stored flow is restored before the browser paints, so a visitor coming
+ * back from a project page never sees the input form flash. On the server the
+ * island renders that form, which is what a first visit gets anyway.
+ */
+const useRestore = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // The toast manager is global, so one Toaster around the flow serves every step.
 export default function RegistaForYou() {
@@ -64,6 +72,16 @@ function RegistaForYouFlow() {
   // Bumped whenever the visitor starts over, so a late prefetch is ignored.
   const token = useRef(0);
 
+  useRestore(() => {
+    const saved = loadFlow();
+    if (!saved) return;
+    setText(saved.text);
+    setRephrasing(saved.rephrasing);
+    // A restored confirm step has no prefetch behind it; confirmQuery fetches.
+    if (saved.step === "posts") setResults(saved.results);
+    setStep(saved.step);
+  }, []);
+
   async function rephrase() {
     setStep("loading");
     try {
@@ -72,6 +90,7 @@ function RegistaForYouFlow() {
         { text },
       );
       setRephrasing(result);
+      saveFlow({ step: "confirm", text, rephrasing: result });
       const current = ++token.current;
       prefetched.current = {
         token: current,
@@ -113,6 +132,12 @@ function RegistaForYouFlow() {
           postsBody(text, rephrasing!),
         ));
       setResults(result);
+      saveFlow({
+        step: "posts",
+        text,
+        rephrasing: rephrasing!,
+        results: result,
+      });
       if (result.calls) {
         toast.add({
           type: "success",
@@ -131,6 +156,7 @@ function RegistaForYouFlow() {
   function restart() {
     token.current++;
     prefetched.current = null;
+    clearFlow();
     setStep("input");
     setRephrasing(null);
     setResults(null);
@@ -178,7 +204,15 @@ function RegistaForYouFlow() {
           >
             この問いで進む
           </button>
-          <button className="underline" onClick={() => setStep("input")}>
+          <button
+            className="underline"
+            onClick={() => {
+              // Rewriting drops the stored question, so a reload does not
+              // bring the visitor back to a confirm screen they left.
+              clearFlow();
+              setStep("input");
+            }}
+          >
             書き直す
           </button>
         </div>

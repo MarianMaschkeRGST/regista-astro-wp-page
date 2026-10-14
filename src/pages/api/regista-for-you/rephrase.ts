@@ -116,7 +116,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     log.costUsd = calculateCost(model, usage)?.totalCost;
 
     const byId = new Map(beliefs.map((belief) => [belief.id, belief]));
-    console.log(Response);
     // The model ranks beliefs by relevance, so the first two are the strongest.
     const matched = [...new Set(output.beliefs)]
       .flatMap((id) => byId.get(id) ?? [])
